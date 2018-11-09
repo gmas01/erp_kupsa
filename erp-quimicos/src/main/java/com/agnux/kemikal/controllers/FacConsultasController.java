@@ -1,9 +1,6 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.agnux.kemikal.controllers;
-import com.agnux.cfd.v2.ArchivoInformeMensual;
+
+
 import com.agnux.cfd.v2.Base64Coder;
 import com.agnux.cfd.v2.BeanFromCfdXml;
 import com.agnux.cfd.v2.CryptoEngine;
@@ -42,12 +39,8 @@ import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
-/**
- * @author gpmarsan@gmail.com
- * Noe Martinez 
- * 28/mayo/2013
- * En esta fecha se separo en dos aplicativos(antes solo era Consulta Cancelacion)
- */
+
+
 @Controller
 @SessionAttributes({"user"})
 @RequestMapping("/facconsultas/")
@@ -229,7 +222,6 @@ public class FacConsultasController {
         HashMap<String, Object> tc = new HashMap<String, Object>();
         HashMap<String, String> userDat = new HashMap<String, String>();
         HashMap<String, String> parametros = new HashMap<String, String>();
-        ArrayList<HashMap<String, Object>> datosAdenda = new ArrayList<HashMap<String, Object>>();
         
         //Decodificar id de usuario
         Integer id_usuario = Integer.parseInt(Base64Coder.decodeString(id_user));
@@ -249,39 +241,11 @@ public class FacConsultasController {
             if (parametros.get("incluye_adenda").equals("true")){
                 //Verificar si el cliente tiene asignada una adenda
                 if(Integer.parseInt(String.valueOf(datosFactura.get(0).get("t_adenda_id")))>0){
-                    
-                    //Obtener datos de la Adenda
-                    datosAdenda = this.getFacdao().getFactura_DatosAdenda(Integer.valueOf(id_factura));
-                    
                     incluirAdenda=true;
                 }
             }
         }
         
-        if(incluirAdenda){
-            if(datosAdenda.size()<=0){
-                /*
-                Si es nuevo, aun no se ha ingresado datos para la addenda.
-                Hay que cargar los datos conocidos que debe llevar la addenda
-                */
-                HashMap<String, Object> row = new HashMap<String, Object>();
-                row.put("id_adenda",0);
-                row.put("generado","false");
-                
-                if(Integer.parseInt(String.valueOf(datosFactura.get(0).get("t_adenda_id")))==3){
-                    row.put("valor1",datosFactura.get(0).get("orden_compra"));//Orden Compra
-                    row.put("valor2",this.getGralDao().geteMailPurchasingEmpresaEmisora(id_empresa));//Email-Emisor
-                    row.put("valor3",datosFactura.get(0).get("moneda_4217"));//Moneda
-                    row.put("valor4",(datosFactura.get(0).get("moneda_4217").equals("MXN"))?"1":datosFactura.get(0).get("tipo_cambio"));//Tipo de Cambio
-                    row.put("valor5",datosFactura.get(0).get("subtotal"));//Subtotal factura
-                    row.put("valor6",datosFactura.get(0).get("total"));//Total Factura
-                    row.put("valor7","");
-                    row.put("valor8","");
-                }
-                
-                datosAdenda.add(row);
-            }
-        }
         
         valorIva= this.getFacdao().getValoriva(id_sucursal);
         tc.put("tipo_cambio", StringHelper.roundDouble(this.getFacdao().getTipoCambioActual(), 4)) ;
@@ -289,7 +253,6 @@ public class FacConsultasController {
         
         jsonretorno.put("datosFactura", datosFactura);
         jsonretorno.put("datosGrid", datosGrid);
-        jsonretorno.put("datosAdenda", datosAdenda);
         jsonretorno.put("Addenda", incluirAdenda);
         jsonretorno.put("iva", valorIva);
         jsonretorno.put("Tc", tipoCambioActual);
@@ -300,12 +263,7 @@ public class FacConsultasController {
         
         return jsonretorno;
     }
-    
-    
-    
-    
-    
-    
+
     //obtiene datos para generador  de informe
     @RequestMapping(method = RequestMethod.POST, value="/datos_generador_informe.json")
     public @ResponseBody HashMap<String,ArrayList<HashMap<String, Integer>>> get_datos_generador_informeJson(Model model) {
@@ -314,96 +272,7 @@ public class FacConsultasController {
         jsonretorno.put("anioinforme", this.getFacdao().getFactura_AnioInforme());
         return jsonretorno;
     }
-    
-    
-    
 
-    
-    
-    
-    
-    
-    
-    //Reporte Mensual SAT (Genera txt)
-    @RequestMapping(value = "/get_genera_txt_reporte_mensual_sat/{month}/{year}/{iu}/out.json", method = RequestMethod.GET ) 
-    public ModelAndView get_genera_txt_reporte_mensual_sat(
-            @PathVariable("year") String year, 
-            @PathVariable("month") String month,
-            @PathVariable("iu") String id_user,
-            HttpServletRequest request, 
-            HttpServletResponse response, 
-            Model model) throws ServletException, IOException, URISyntaxException {
-        
-        HashMap<String, String> userDat = new HashMap<String, String>();
-        
-        //decodificar id de usuario
-        Integer id_usuario = Integer.parseInt(Base64Coder.decodeString(id_user));
-        //System.out.println("id_usuario: "+id_usuario);
-        
-        userDat = this.getHomeDao().getUserById(id_usuario);
-        Integer id_empresa = Integer.parseInt(userDat.get("empresa_id"));
-        
-        ArchivoInformeMensual aim = new ArchivoInformeMensual();
-        
-        String nombre_txt = aim.generaNombreArchivoInformeMensual("1",this.getGralDao().getRfcEmpresaEmisora(id_empresa),month,year,"txt");
-        String fileout = this.getGralDao().getTmpDir() + nombre_txt;
-         File toFile = new File(fileout);
-    	if (toFile.exists()) {
-            //si el archivo ya esxiste, es eliminado
-            toFile.delete();
-        }
-        
-        
-        ArrayList<HashMap<String, Object>> valor_emitidos = this.getFacdao().getComprobantesActividadPorMes(year, month,id_empresa);
-        
-        for(HashMap<String,Object> iteradorX : valor_emitidos){
-            String renglon = aim.generarRegistroPorRenglonParaArchivoInformeMensual(
-                    String.valueOf(iteradorX.get("rfc_cliente")),
-                    String.valueOf(iteradorX.get("serie")),
-                    String.valueOf(iteradorX.get("folio_del_comprobante_fiscal")),
-                    String.valueOf(iteradorX.get("numero_de_aprobacion")),
-                    String.valueOf(iteradorX.get("momento_expedicion")),
-                    String.valueOf(iteradorX.get("monto_de_la_operacion")),
-                    String.valueOf(iteradorX.get("monto_del_impuesto")),
-                    String.valueOf(iteradorX.get("estado_del_comprobante")),
-                    String.valueOf(iteradorX.get("efecto_de_comprobante")),
-                    String.valueOf(iteradorX.get("pedimento")),
-                    String.valueOf(iteradorX.get("fecha_de_pedimento")),
-                    String.valueOf(iteradorX.get("aduana")),
-                    String.valueOf(iteradorX.get("anoaprovacion")));
-            
-            if(!renglon.isEmpty()){
-                //FileHelper.addText2File(System.getProperty("java.io.tmpdir")+ "/" + nombre_txt,renglon);
-                FileHelper.addText2File(this.getGralDao().getTmpDir() + nombre_txt,renglon);
-            }
-	}
-        
-        //String fileout = System.getProperty("java.io.tmpdir")+ "/" + nombre_txt;
-        
-        System.out.println("Recuperando archivo: " + fileout);
-        
-        File file = new File(fileout);
-        if (file.exists()==false){
-            System.out.println("No hay facturas en este mes");
-            FileHelper.addText2File(this.getGralDao().getTmpDir() + nombre_txt,"");
-        }
-        
-        int size = (int) file.length(); // Tamaño del archivo
-        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
-        response.setBufferSize(size);
-        response.setContentLength(size);
-        response.setContentType("text/plain");
-        response.setHeader("Content-Disposition","attachment; filename=\"" + file.getName() +"\"");
-        FileCopyUtils.copy(bis, response.getOutputStream());
-        response.flushBuffer();
-        
-        return null;
-    }
-    
-    
-    
-    
-    
     //Enviar archivos por E-Mail
     @RequestMapping(method = RequestMethod.POST, value="/getSendMail.json")
     public @ResponseBody HashMap<String,String> getSendMailJson(
@@ -1005,9 +874,6 @@ public class FacConsultasController {
         valor_retorno = XmlHelper.transformar(comprobante, this.getGralDao().getXslDir() + this.getGralDao().getRfcEmpresaEmisora(id_empresa)+"/"+ this.getGralDao().getFicheroXslTimbre(id_empresa, id_sucursal));
         
         return valor_retorno;
-    }
-    
-
-    
+    }    
     
 }
